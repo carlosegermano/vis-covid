@@ -1,2 +1,0 @@
-"0","ggplot(covid_br, aes(x = data, y = casosNovos)) +"
-"0","  geom_col()"

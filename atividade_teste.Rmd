@@ -1,0 +1,178 @@
+---
+title: "Manipulação e comparação de dados agrupados"
+author: "Carlos Eduardo"
+date: "29/06/2020"
+output: html_document
+---
+
+```{r}
+pkgs <- c("tidyverse", "geofacet", "here", "patchwork", "scales", "zoo")
+install.packages(pkgs, dependencies = TRUE, repos = "http://cran.us.r-project.org")
+```
+
+```{r, include=FALSE}
+library(tidyverse) # conjunto de pacotes que sempre iremos usar
+library(geofacet) # organiza plots de acordo com região
+library(here) # acesso a arquivos relativos à partir da raíz do projeto
+library(lubridate) # manipulação de datas (tidyverse)
+library(patchwork) # organiza o layout dos plots
+library(readxl) # carrega arquivos excel (tidyverse)
+library(scales) # funções úteis para lidar com escalas de gráficos
+library(zoo) # função de média móvel (rolling average)
+```
+
+Carregando os dados
+
+```{r}
+covid <- read_xlsx(here("data", "HIST_PAINEL_COVIDBR_24jun2020.xlsx"),
+                   guess_max = 100000)
+glimpse(covid)
+```
+
+Filtrando os dados para mostrar apenas dados do Brasil
+
+
+```{r}
+covid_pais <- covid %>%
+  filter(is.na(estado), is.na(codmun))
+
+glimpse(covid_pais)
+```
+
+Visualizando os dados
+
+```{r}
+p_casos_novos <- ggplot(covid_pais, aes(data, casosNovos)) +
+  geom_line()
+
+p_casos_acc <- ggplot(covid_pais, aes(data, casosAcumulado)) +
+  geom_line()
+
+p_obitos_novos <- ggplot(covid_pais, aes(data, obitosNovos)) +
+  geom_line()
+
+p_obitos_acc <- ggplot(covid_pais, aes(data, obitosAcumulado)) +
+  geom_line()
+
+# mostrando vários plots na mesma imagem com o pacote patchwork 
+p_casos_novos + p_casos_acc + p_obitos_novos + p_obitos_acc
+```
+
+Dados agregados por estado
+
+```{r}
+covid_estados <- covid %>%
+  filter(!is.na(estado), is.na(codmun))
+
+glimpse(covid_estados)
+```
+
+Dados agregados por município
+
+```{r}
+covid_municipios <- covid %>%
+  filter(!is.na(estado), !is.na(municipio))
+
+glimpse(covid_municipios)
+```
+
+Visualizando dados por grupo
+
+```{r}
+ggplot(covid_estados, aes(data, casosAcumulado, group = estado)) +
+  geom_line()
+```
+
+Usando cores para discriminar os grupos
+
+```{r}
+ggplot(covid_estados, aes(data, casosAcumulado, colour = estado)) +
+  geom_line()
+```
+
+Separando os dados através do uso de Facets
+
+```{r}
+ggplot(covid_estados, aes(data, casosNovos)) +
+  geom_line() +
+  facet_wrap(vars(estado), ncol = 4)
+
+```
+
+Tornando as escalas independentes
+
+```{r}
+ggplot(covid_estados, aes(data, casosNovos)) +
+  geom_line() +
+  facet_wrap(vars(estado), ncol = 4, scales = "free_y")
+```
+
+Comparando as escalas linear e logarítmica e visualizando os dados anteriores na escala logarítmica
+
+```{r}
+dados <- tibble(semana = 1:15, casos = 2^semana)
+
+p <- ggplot(dados, aes(semana, casos)) +
+  geom_line()
+
+p1 <- p +
+  ggtitle("Escala linear")
+
+p2 <- p +
+  scale_y_continuous(trans = "log2", breaks = 2^seq(1, 15, 2)) +
+  ggtitle("Escala log")
+
+p1 + p2
+```
+
+```{r}
+ggplot(covid_estados, aes(data, casosNovos)) +
+  geom_line() +
+  facet_wrap(vars(estado), ncol = 4) +
+  scale_y_log10()
+
+```
+
+Utilizando método de suavização da curva
+
+```{r}
+ggplot(covid_estados, aes(data, casosNovos)) +
+  geom_point(alpha = 0.2) +
+  geom_smooth() +
+  facet_wrap(vars(estado), ncol = 4) +
+  scale_y_log10()
+```
+
+Utilizando média móvel
+
+```{r}
+covid_estados <- covid_estados %>%
+  group_by(estado) %>%
+  mutate(casosNovosMediaMovel = rollmeanr(casosNovos, 7, fill = NA))
+
+ggplot(covid_estados, aes(data, casosNovos)) +
+  geom_point(alpha = 0.2) +
+  geom_line(aes(y = casosNovosMediaMovel), col = "blue", size = 0.8) +
+  facet_wrap(vars(estado), ncol = 4) +
+  scale_y_log10()
+```
+
+Retoques finais
+
+```{r}
+ggplot(filter(covid_estados, data >= dmy("15-03-2020")),
+       aes(data, casosNovos, col = regiao)) +
+  geom_point(alpha = 0.2) +
+  geom_line(aes(y = casosNovosMediaMovel), size = 0.8) +
+  facet_geo(~ estado, grid = "br_states_grid1") +
+  scale_y_log10(labels = trans_format("log10", math_format(10^.x))) +
+  scale_color_brewer("Região", palette = "Set2") +
+  labs(title = "Casos novos por dia nos estados",
+       subtitle = "Em escala log. A linha representa a média móvel para 7 dias",
+       caption = "Fonte dos dados: Ministério da Saúde") +
+  theme_minimal() +
+  theme(legend.position = "top", axis.title = element_blank(),
+        strip.text = element_text(face = "bold"),
+        plot.title = element_text(face = "bold"))
+```
+
