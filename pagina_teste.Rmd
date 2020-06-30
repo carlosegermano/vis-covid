@@ -1,0 +1,73 @@
+---
+title: "relatorio_teste"
+author: "Carlos Eduardo"
+date: "30/06/2020"
+output:
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+---
+
+```{r, echo=FALSE}
+library(dplyr)
+library(ggplot2)
+```
+
+Carregando os dados
+
+```{r}
+casos_estados <- read.csv("https://raw.githubusercontent.com/marcuswac/covid-br-data/master/covid-br-ms-states.csv")
+
+glimpse(casos_estados)
+
+```
+
+Resumo estatístico dos dados
+
+```{r}
+summary(casos_estados)
+```
+
+Filtrando os dados para os estados de SP e RJ
+
+```{r}
+casos_sp_rj <- casos_estados %>%
+  filter(estado == "SP" | estado == "RJ") %>%
+  mutate(data = as.Date(data, format = "%Y-%m-%d"))
+
+casos_sp_rj
+```
+
+Plotando os dados
+
+```{r}
+plot1 <- ggplot(casos_sp_rj, aes(x = data, y = casosAcumulado,
+                                 color = estado)) +
+  geom_line()
+
+
+plot1
+```
+
+
+################################################################################
+  Comparação no número de casos acumulados de Covid-19 nos estados do nordeste 
+################################################################################
+
+Filtrando apenas estados do nordeste
+
+```{r}
+casos_nordeste <- casos_estados %>%
+  filter(regiao == "Nordeste") %>%
+  mutate(data = as.Date(data, format = "%Y-%m-%d"))
+```
+
+Plotando os dados
+
+```{r}
+my_plot <- ggplot(casos_nordeste, aes(x = data, y = casosAcumulado)) +
+  geom_line(aes(colour = estado, linetype = estado)) +
+  theme(legend.position = "bottom")
+
+my_plot
+```
